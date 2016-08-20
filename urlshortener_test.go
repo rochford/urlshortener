@@ -9,7 +9,7 @@ import (
 func TestGenerateShortURL(t *testing.T) {
 	expectedLongURL := "http://www.abc.org"
 	for i := 0; i < 1e3; i++ {
-		str := GenerateShortURL(expectedLongURL)
+		str, _ := GenerateShortURL(expectedLongURL)
 		if len(str) != stringLength {
 			t.Errorf("GenerateShortURL returned incorrect length %d, expected %d",
 				len(str), stringLength)
@@ -54,12 +54,25 @@ func TestConcurrentResolveShortURL(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			actualLongURL := ResolveShortURL(expectedMapKey)
+			actualLongURL, err := ResolveShortURL(expectedMapKey)
 			if actualLongURL != expectedMapValue {
 				t.Errorf("TestResolveShortURL incorrect longURL")
+			}
+			if err != nil {
+				t.Errorf("TestResolveShortURL error value must be nil")
 			}
 		}()
 	}
 
 	wg.Wait()
+}
+
+func TestResolveShortURLUnknown(t *testing.T) {
+	actualLongURL, err := ResolveShortURL("UNKNOWN")
+	if actualLongURL != "" {
+		t.Errorf("TestResolveShortURL incorrect longURL")
+	}
+	if err != nil {
+		t.Errorf("TestResolveShortURL error value must be nil")
+	}
 }

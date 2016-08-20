@@ -2,6 +2,7 @@
 package urlshortener
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 )
@@ -57,32 +58,36 @@ func init() {
 }
 
 // GenerateShortURL function returns a shortened URL. It sends a request for a
-// shortened URL on the channel
-// and expects the response within a time period. XXX if there is a timeout
-// on the channel response then an error is returned.
-func GenerateShortURL(longURL string) string {
+// shortened URL on the channel and expects the response within a time period.
+// If there is a timeout on the channel response then an error is returned.
+func GenerateShortURL(longURL string) (string, error) {
 	req := urlShortenerRequestResponse{longURL, make(chan (string), 1)}
-
 	urlShortenerRequestChannel <- req
-	select {
 
+	select {
+	// success
 	case shortURL := <-req.responseChannel:
-		// success
-		return shortURL
+		return shortURL, nil
+	// timeout on channel
 	case <-time.After(time.Millisecond * 100):
-		// timeout on channel
 		// TODO: XXX timeout error returned
-		return ""
+		return "", errors.New("urlshortener: GenerateShortURL timeout")
 	}
 }
 
-// ResolveShortURL looks up the shortURL in the map
-func ResolveShortURL(shortURL string) string {
+// ResolveShortURL looks up the shortURL in the map. If shortURL does not exist
+// an empty strng is returned. If there is a timeout on the channel response
+// then an error is returned.
+func ResolveShortURL(shortURL string) (string, error) {
 	lookup := urlShortenerLookupRequestResponse{shortURL, make(chan (string), 1)}
-
 	urlShortenerLookupChannel <- lookup
-	longURL := <-lookup.responseChannel
 
-	// TODO: XXX timeout error returned
-	return longURL
+	select {
+	// success
+	case longURL := <-lookup.responseChannel:
+		return longURL, nil
+	// timeout on channel
+	case <-time.After(time.Millisecond * 100):
+		return "", errors.New("urlshortener: ResolveShortURL timeout")
+	}
 }
