@@ -5,6 +5,8 @@ import (
 	"errors"
 	"math/rand"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 var stringLength = 6
@@ -58,9 +60,17 @@ func init() {
 }
 
 // GenerateShortURL function returns a shortened URL. It sends a request for a
-// shortened URL on the channel and expects the response within a time period.
-// If there is a timeout on the channel response then an error is returned.
-func GenerateShortURL(longURL string) (string, error) {
+// shortened URL on the channel. If the context is Done, then
+// this function returns and error.
+func GenerateShortURL(ctx context.Context) (string, error) {
+	v := ctx.Value("originalUrl")
+	if v == nil {
+		return "", errors.New("longURL value not found in context")
+	}
+	longURL := ctx.Value("originalUrl").(string)
+	if longURL == "" {
+		return "", errors.New("longURL missing")
+	}
 	req := urlShortenerRequestResponse{longURL, make(chan (string), 1)}
 	urlShortenerRequestChannel <- req
 
@@ -68,26 +78,36 @@ func GenerateShortURL(longURL string) (string, error) {
 	// success
 	case shortURL := <-req.responseChannel:
 		return shortURL, nil
-	// timeout on channel
-	case <-time.After(time.Millisecond * 100):
-		// TODO: XXX timeout error returned
-		return "", errors.New("urlshortener: GenerateShortURL timeout")
+	// conext is done
+	case <-ctx.Done():
+		return "", ctx.Err()
 	}
 }
 
 // ResolveShortURL looks up the shortURL in the map. If shortURL does not exist
-// an empty strng is returned. If there is a timeout on the channel response
-// then an error is returned.
-func ResolveShortURL(shortURL string) (string, error) {
+// an empty string is returned along with an error. If the context is Done, then
+// this function returns and error.
+func ResolveShortURL(ctx context.Context) (string, error) {
+	v := ctx.Value("id")
+	if v == nil {
+		return "", errors.New("shortURL value not found in context")
+	}
+	shortURL := ctx.Value("id").(string)
+	if shortURL == "" {
+		return "", errors.New("shortURL missing")
+	}
 	lookup := urlShortenerLookupRequestResponse{shortURL, make(chan (string), 1)}
 	urlShortenerLookupChannel <- lookup
 
 	select {
 	// success
 	case longURL := <-lookup.responseChannel:
+		if longURL == "" {
+			return "", errors.New("could not find a URL in map")
+		}
 		return longURL, nil
-	// timeout on channel
-	case <-time.After(time.Millisecond * 100):
-		return "", errors.New("urlshortener: ResolveShortURL timeout")
+	// conext is done
+	case <-ctx.Done():
+		return "", ctx.Err()
 	}
 }

@@ -4,12 +4,16 @@ import (
 	"sync"
 	"testing"
 	"unicode"
+
+	"golang.org/x/net/context"
 )
 
 func TestGenerateShortURL(t *testing.T) {
 	expectedLongURL := "http://www.abc.org"
 	for i := 0; i < 1e3; i++ {
-		str, _ := GenerateShortURL(expectedLongURL)
+		ctx := context.Background()
+		ctx = context.WithValue(ctx, "originalUrl", expectedLongURL)
+		str, _ := GenerateShortURL(ctx)
 		if len(str) != stringLength {
 			t.Errorf("GenerateShortURL returned incorrect length %d, expected %d",
 				len(str), stringLength)
@@ -35,7 +39,9 @@ func TestConcurrentAccessUrlMap(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			GenerateShortURL("http://www.something.org")
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, "originalUrl", "http://www.something.org")
+			GenerateShortURL(ctx)
 		}()
 	}
 
@@ -54,7 +60,10 @@ func TestConcurrentResolveShortURL(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			actualLongURL, err := ResolveShortURL(expectedMapKey)
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, "id", expectedMapKey)
+
+			actualLongURL, err := ResolveShortURL(ctx)
 			if actualLongURL != expectedMapValue {
 				t.Errorf("TestResolveShortURL incorrect longURL")
 			}
@@ -68,11 +77,95 @@ func TestConcurrentResolveShortURL(t *testing.T) {
 }
 
 func TestResolveShortURLUnknown(t *testing.T) {
-	actualLongURL, err := ResolveShortURL("UNKNOWN")
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "id", "UNKNOWN")
+
+	actualLongURL, err := ResolveShortURL(ctx)
 	if actualLongURL != "" {
 		t.Errorf("TestResolveShortURL incorrect longURL")
 	}
-	if err != nil {
-		t.Errorf("TestResolveShortURL error value must be nil")
+	if err == nil {
+		t.Errorf("TestResolveShortURL error value must not be nil")
+	}
+}
+
+func TestGenerateShortURLMissingLongURL(t *testing.T) {
+	ctx := context.Background()
+	shortURL, err := GenerateShortURL(ctx)
+
+	if err == nil {
+		t.Errorf("TestGenerateShortURLContextDone error value must not be nil")
+	}
+	if shortURL != "" {
+		t.Errorf("TestGenerateShortURLContextDone incorrect shortURL")
+	}
+}
+
+func TestResolveShortURLMissing(t *testing.T) {
+	ctx := context.Background()
+
+	actualLongURL, err := ResolveShortURL(ctx)
+	if err == nil {
+		t.Errorf("TestResolveShortURLContextDone error value must not be nil")
+	}
+	if actualLongURL != "" {
+		t.Errorf("TestResolveShortURLContextDone incorrect longURL")
+	}
+}
+
+func TestGenerateShortURLEmptyLongURL(t *testing.T) {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "originalUrl", "")
+	shortURL, err := GenerateShortURL(ctx)
+
+	if err == nil {
+		t.Errorf("TestGenerateShortURLContextDone error value must not be nil")
+	}
+	if shortURL != "" {
+		t.Errorf("TestGenerateShortURLContextDone incorrect shortURL")
+	}
+}
+
+func TestResolveShortURLEmpty(t *testing.T) {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "id", "")
+
+	actualLongURL, err := ResolveShortURL(ctx)
+	if err == nil {
+		t.Errorf("TestResolveShortURLContextDone error value must not be nil")
+	}
+	if actualLongURL != "" {
+		t.Errorf("TestResolveShortURLContextDone incorrect longURL")
+	}
+}
+
+func TestGenerateShortURLContextDone(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = context.WithValue(ctx, "originalUrl", "http://www.something.org")
+	cancel()
+	<-ctx.Done()
+
+	shortURL, err := GenerateShortURL(ctx)
+
+	if shortURL != "" {
+		t.Errorf("TestGenerateShortURLContextDone incorrect shortURL")
+	}
+	if err == nil {
+		t.Errorf("TestGenerateShortURLContextDone error value must not be nil")
+	}
+}
+
+func TestResolveShortURLContextDone(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = context.WithValue(ctx, "id", "UNKNOWN")
+	cancel()
+	<-ctx.Done()
+
+	actualLongURL, err := ResolveShortURL(ctx)
+	if actualLongURL != "" {
+		t.Errorf("TestResolveShortURLContextDone incorrect longURL")
+	}
+	if err == nil {
+		t.Errorf("TestResolveShortURLContextDone error value must not be nil")
 	}
 }
