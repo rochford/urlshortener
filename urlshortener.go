@@ -63,11 +63,11 @@ func init() {
 // shortened URL on the channel. If the context is Done, then
 // this function returns and error.
 func GenerateShortURL(ctx context.Context) (string, error) {
-	v := ctx.Value("originalUrl")
+	v := ctx.Value("originalURL")
 	if v == nil {
 		return "", errors.New("longURL value not found in context")
 	}
-	longURL := ctx.Value("originalUrl").(string)
+	longURL := ctx.Value("originalURL").(string)
 	if longURL == "" {
 		return "", errors.New("longURL missing")
 	}

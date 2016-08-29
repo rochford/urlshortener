@@ -12,7 +12,7 @@ func TestGenerateShortURL(t *testing.T) {
 	expectedLongURL := "http://www.abc.org"
 	for i := 0; i < 1e3; i++ {
 		ctx := context.Background()
-		ctx = context.WithValue(ctx, "originalUrl", expectedLongURL)
+		ctx = context.WithValue(ctx, "originalURL", expectedLongURL)
 		str, _ := GenerateShortURL(ctx)
 		if len(str) != stringLength {
 			t.Errorf("GenerateShortURL returned incorrect length %d, expected %d",
@@ -40,7 +40,7 @@ func TestConcurrentAccessUrlMap(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			ctx := context.Background()
-			ctx = context.WithValue(ctx, "originalUrl", "http://www.something.org")
+			ctx = context.WithValue(ctx, "originalURL", "http://www.something.org")
 			GenerateShortURL(ctx)
 		}()
 	}
@@ -115,7 +115,7 @@ func TestResolveShortURLMissing(t *testing.T) {
 
 func TestGenerateShortURLEmptyLongURL(t *testing.T) {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "originalUrl", "")
+	ctx = context.WithValue(ctx, "originalURL", "")
 	shortURL, err := GenerateShortURL(ctx)
 
 	if err == nil {
